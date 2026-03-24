@@ -24,10 +24,13 @@ jobs:
       - name: Set MLflow URI
         run: echo "MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_URI }}" >> $GITHUB_ENV
 
+      - name: Pull data
+        run: dvc pull || echo "No DVC dataset"
+
       - name: Train model
         run: python train.py
 
-      - name: Extract Run ID
+      - name: Save Run ID
         run: |
           python - << EOF
           import mlflow
@@ -71,7 +74,7 @@ jobs:
         with:
           name: model-info
 
-      - name: Check threshold
+      - name: Check model performance
         run: python check_threshold.py
 
       - name: Mock Docker build
