@@ -1,0 +1,78 @@
+name: ML Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install mlflow scikit-learn numpy pandas dvc
+
+      - name: Set MLflow URI
+        run: echo "MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_URI }}" >> $GITHUB_ENV
+
+      - name: Train model
+        run: python train.py
+
+      - name: Extract Run ID
+        run: |
+          python - << EOF
+          import mlflow
+          import os
+
+          mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
+
+          runs = mlflow.search_runs(order_by=["start_time DESC"], max_results=1)
+          run_id = runs.loc[0, "run_id"]
+
+          with open("model_info.txt", "w") as f:
+              f.write(run_id)
+          EOF
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-info
+          path: model_info.txt
+
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: validate
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install MLflow
+        run: pip install mlflow
+
+      - name: Set MLflow URI
+        run: echo "MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_URI }}" >> $GITHUB_ENV
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: model-info
+
+      - name: Check threshold
+        run: python check_threshold.py
+
+      - name: Mock Docker build
+        run: echo "Building Docker image for Run ID: $(cat model_info.txt)"
