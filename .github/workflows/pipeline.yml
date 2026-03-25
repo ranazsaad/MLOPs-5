@@ -24,33 +24,19 @@ jobs:
       - name: Set MLflow URI
         run: echo "MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_URI }}" >> $GITHUB_ENV
 
-      - name: Pull data
-        run: dvc pull || echo "No DVC dataset"
+      - name: Configure DVC
+        run: |
+          dvc remote add -d storage https://dagshub.com/your-username/MLOPs-5.dvc
+          dvc pull || echo "No DVC dataset"
 
       - name: Train model
         run: python train.py
-
-      - name: Save Run ID
-        run: |
-          python - << EOF
-          import mlflow
-          import os
-
-          mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
-
-          runs = mlflow.search_runs(order_by=["start_time DESC"], max_results=1)
-          run_id = runs.loc[0, "run_id"]
-
-          with open("model_info.txt", "w") as f:
-              f.write(run_id)
-          EOF
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: model-info
           path: model_info.txt
-
 
   deploy:
     runs-on: ubuntu-latest
@@ -78,4 +64,7 @@ jobs:
         run: python check_threshold.py
 
       - name: Mock Docker build
-        run: echo "Building Docker image for Run ID: $(cat model_info.txt)"
+        run: |
+          RUN_ID=$(cat model_info.txt)
+          echo "Building Docker image for Run ID: $RUN_ID"
+          echo "docker build --build-arg RUN_ID=$RUN_ID -t model:$RUN_ID ."

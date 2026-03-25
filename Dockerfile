@@ -5,6 +5,15 @@ ENV RUN_ID=$RUN_ID
 
 WORKDIR /app
 
-RUN echo "Downloading model for RUN_ID: $RUN_ID"
+# Install MLflow if needed for downloading models
+RUN pip install mlflow
 
-CMD ["bash", "-c", "echo Running model container with RUN_ID=$RUN_ID"]
+# Download model from MLflow (simulation)
+RUN echo "Downloading model for RUN_ID: $RUN_ID" && \
+    echo "mlflow models download -r $RUN_ID" > download_model.sh && \
+    chmod +x download_model.sh
+
+# In a real scenario, you'd download the actual model
+# RUN mlflow models download -r $RUN_ID
+
+CMD ["bash", "-c", "echo Running model container with RUN_ID=$RUN_ID && ./download_model.sh"]
